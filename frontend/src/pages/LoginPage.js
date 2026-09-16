@@ -185,6 +185,6 @@ export default function LoginPage() {
           © 2026 Inventra · Inventory Intelligence Platform
         </div>
       </div>
-    </div>
+    </div>   
   );
 }
