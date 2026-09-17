@@ -1,0 +1,3 @@
+qr_code,name,category,quantity,expiry_date,price,supplier,shelf
+CSV-TEST-001,Test Biscuits,Snacks,25,2027-12-31,30,CSV Supplier,A2
+QR-TEST-001,QR Test Product Updated,Snacks,35,2028-06-30,120,CSV Supplier,B3

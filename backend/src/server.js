@@ -2,11 +2,26 @@ require('dotenv').config();
 
 const express = require('express');
 const db = require('./db');
+const authRoutes = require('./routes/auth');
+const meRoutes = require('./routes/me');
+const verificationRoutes = require('./routes/verification');
+const profileRoutes = require('./routes/profile');
+const passwordRoutes = require('./routes/password');
+const productsRoutes = require('./routes/products');
+const barcodeRoutes = require('./routes/barcode');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(express.json());
+
+app.use('/api/auth', authRoutes);
+app.use('/api/auth/me', meRoutes);
+app.use('/api/auth', verificationRoutes);
+app.use('/api/auth/profile', profileRoutes);
+app.use('/api/auth/password', passwordRoutes);
+app.use('/api/products', productsRoutes);
+app.use('/api/barcode', barcodeRoutes);
 
 app.get('/api/health', async (req, res) => {
   try {
