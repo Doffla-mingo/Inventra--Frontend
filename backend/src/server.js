@@ -9,6 +9,9 @@ const profileRoutes = require('./routes/profile');
 const passwordRoutes = require('./routes/password');
 const productsRoutes = require('./routes/products');
 const barcodeRoutes = require('./routes/barcode');
+const triggersRoutes = require('./routes/triggers');
+const emailsRoutes = require('./routes/emails');
+const growthRoutes = require('./routes/growth');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -22,6 +25,9 @@ app.use('/api/auth/profile', profileRoutes);
 app.use('/api/auth/password', passwordRoutes);
 app.use('/api/products', productsRoutes);
 app.use('/api/barcode', barcodeRoutes);
+app.use('/api/triggers', triggersRoutes);
+app.use('/api/emails', emailsRoutes);
+app.use('/api/growth', growthRoutes);
 
 app.get('/api/health', async (req, res) => {
   try {

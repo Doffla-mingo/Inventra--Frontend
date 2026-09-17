@@ -72,3 +72,72 @@ router.get('/verify-email', async (req, res) => {
 });
 
 module.exports = router;
+router.post('/resend-verification', async (req, res) => {
+  try {
+    const email = String(req.body.email || '').trim().toLowerCase();
+
+    if (!email) {
+      return res.status(400).json({
+        error: 'email_required'
+      });
+    }
+
+    const [users] = await db.query(
+      `SELECT id, name, email, email_verified
+       FROM users
+       WHERE email = ?`,
+      [email]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({
+        error: 'user_not_found'
+      });
+    }
+
+    const user = users[0];
+
+    if (user.email_verified) {
+      return res.status(400).json({
+        error: 'email_already_verified'
+      });
+    }
+
+    const crypto = require('crypto');
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await db.query(
+      `UPDATE users
+       SET verification_token = ?, verification_expires = ?
+       WHERE id = ?`,
+      [token, expires, user.id]
+    );
+
+    try {
+      const transporter = require('../mailer');
+
+      await transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: user.email,
+        subject: 'Verify your Inventra account',
+        text: `Hello ${user.name}, your verification token is: ${token}`
+      });
+    } catch (emailError) {
+      console.error('Resend verification email error:', emailError.message);
+
+      return res.status(503).json({
+        error: 'email_send_failed'
+      });
+    }
+
+    res.json({
+      message: 'verification_sent'
+    });
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    res.status(500).json({
+      error: 'server_error'
+    });
+  }
+});
