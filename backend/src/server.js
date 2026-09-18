@@ -23,6 +23,7 @@ const emailsRoutes = require('./routes/emails');
 const growthRoutes = require('./routes/growth');
 const forecastRoutes = require('./routes/forecast');
 const chatRoutes = require('./routes/chat');
+const startNotificationScheduler = require('./scheduler');
 
 // Authentication
 app.use('/api/auth', authRoutes);
@@ -43,6 +44,9 @@ app.use('/api/emails', emailsRoutes);
 app.use('/api/growth', growthRoutes);
 app.use('/api/forecast', forecastRoutes);
 app.use('/api/chat', chatRoutes);
+
+// Scheduled notifications
+startNotificationScheduler();
 
 // Health check
 app.get('/api/health', async (req, res) => {
@@ -66,3 +70,4 @@ app.get('/api/health', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Inventra backend running on http://localhost:${PORT}`);
 });
+

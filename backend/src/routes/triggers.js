@@ -7,7 +7,8 @@ const router = express.Router();
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const [rows] = await db.query(
-      'SELECT id, product_name, trigger_type, threshold, enabled, created_at FROM triggers ORDER BY id DESC'
+      'SELECT id, product_name, trigger_type, threshold, enabled, created_at FROM triggers WHERE user_id = ? ORDER BY id DESC',
+      [req.user.id]
     );
 
     res.json(rows);
@@ -16,8 +17,6 @@ router.get('/', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'server_error' });
   }
 });
-
-module.exports = router;
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const { product_name, trigger_type, threshold } = req.body;
@@ -37,15 +36,14 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     const [result] = await db.query(
-      `INSERT INTO triggers (product_name, trigger_type, threshold, enabled)
-       VALUES (?, ?, ?, TRUE)`,
-      [product_name.trim(), trigger_type, parsedThreshold]
+      `INSERT INTO triggers (product_name, trigger_type, threshold, enabled, user_id)
+       VALUES (?, ?, ?, TRUE, ?)`,
+      [product_name.trim(), trigger_type, parsedThreshold, req.user.id]
     );
 
     const [rows] = await db.query(
       `SELECT id, product_name, trigger_type, threshold, enabled, created_at
-       FROM triggers
-       WHERE id = ?`,
+       FROM triggers WHERE id = ? AND user_id = ?`,
       [result.insertId]
     );
 
@@ -77,8 +75,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
     }
 
     const [result] = await db.query(
-      'UPDATE triggers SET enabled = ? WHERE id = ?',
-      [enabled, id]
+      'UPDATE triggers SET enabled = ? WHERE id = ? AND user_id = ?',
+      [enabled, id, req.user.id]
     );
 
     if (result.affectedRows === 0) {
@@ -89,9 +87,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
     const [rows] = await db.query(
       `SELECT id, product_name, trigger_type, threshold, enabled, created_at
-       FROM triggers
-       WHERE id = ?`,
-      [id]
+       FROM triggers WHERE id = ? AND user_id = ?`,
+      [id, req.user.id]
     );
 
     res.json({
@@ -114,9 +111,8 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     }
 
     const [result] = await db.query(
-      'DELETE FROM triggers WHERE id = ?',
-      [id]
-    );
+      'DELETE FROM triggers WHERE id = ? AND user_id = ?',
+      [id, req.user.id]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({
@@ -135,11 +131,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 });
 router.post('/check', authenticateToken, async (req, res) => {
   try {
-    const [triggerRows] = await db.query(
-      `SELECT id, product_name, trigger_type, threshold, enabled
-       FROM triggers
-       WHERE enabled = TRUE`
-    );
+    const [triggerRows] = await db.query(`SELECT id, product_name, trigger_type, threshold, enabled FROM triggers WHERE enabled = TRUE AND user_id = ?`, [req.user.id]);
 
     const alerts = [];
 
@@ -192,3 +184,25 @@ router.post('/check', authenticateToken, async (req, res) => {
     });
   }
 });
+
+
+
+module.exports = router;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
