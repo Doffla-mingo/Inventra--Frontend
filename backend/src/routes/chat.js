@@ -51,6 +51,19 @@ ${document_content ? `Document content:\n${document_content}` : ''}
     if (!response.ok) {
       console.error('Claude API error:', data);
 
+      const errorType = data.error?.type;
+      const errorMessage = data.error?.message || '';
+
+      if (
+        errorType === 'invalid_request_error' &&
+        errorMessage.toLowerCase().includes('credit')
+      ) {
+        return res.status(503).json({
+          error: 'claude_credits_required',
+          message: 'Claude API credits are required to use the AI assistant.'
+        });
+      }
+
       return res.status(response.status).json({
         error: 'claude_api_error'
       });
@@ -76,3 +89,4 @@ ${document_content ? `Document content:\n${document_content}` : ''}
 });
 
 module.exports = router;
+
