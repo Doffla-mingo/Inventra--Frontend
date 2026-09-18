@@ -22,6 +22,7 @@ const triggersRoutes = require('./routes/triggers');
 const emailsRoutes = require('./routes/emails');
 const growthRoutes = require('./routes/growth');
 const forecastRoutes = require('./routes/forecast');
+const chatRoutes = require('./routes/chat');
 
 // Authentication
 app.use('/api/auth', authRoutes);
@@ -41,6 +42,7 @@ app.use('/api/emails', emailsRoutes);
 // Growth and forecast
 app.use('/api/growth', growthRoutes);
 app.use('/api/forecast', forecastRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Health check
 app.get('/api/health', async (req, res) => {
