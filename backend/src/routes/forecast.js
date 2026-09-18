@@ -1,7 +1,6 @@
 const express = require('express');
 const db = require('../db');
 const authenticateToken = require('../middleware/auth');
-
 const router = express.Router();
 
 router.get('/latest', authenticateToken, async (req, res) => {
