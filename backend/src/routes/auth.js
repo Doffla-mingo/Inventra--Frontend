@@ -23,6 +23,10 @@ router.post('/register', async (req, res) => {
       });
     }
 
+    if (!transporter.isConfigured()) {
+      return res.status(503).json({ error: 'email_not_configured' });
+    }
+
     const normalizedEmail = email.trim().toLowerCase();
 
     const [existingUsers] = await db.execute(
@@ -63,14 +67,21 @@ router.post('/register', async (req, res) => {
       ]
     );
 
-    const verificationLink = `http://localhost:3000/verify-email?token=${verificationToken}`;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const verificationLink = `${frontendUrl}/verify-email?token=${encodeURIComponent(verificationToken)}`;
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: normalizedEmail,
-      subject: 'Verify your Inventra account',
-      text: `Welcome to Inventra! Verify your email using this link: ${verificationLink}`
-    });
+    try {
+      await transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: normalizedEmail,
+        subject: 'Verify your Inventra account',
+        text: `Welcome to Inventra! Verify your email using this link: ${verificationLink}`,
+        html: `<p>Welcome to Inventra!</p><p><a href="${verificationLink}">Verify your email address</a></p><p>This link expires in 24 hours.</p>`
+      });
+    } catch (emailError) {
+      console.error('Registration email error:', emailError.message);
+      return res.status(503).json({ error: 'email_send_failed' });
+    }
 
     res.status(201).json({
       message: 'verification_sent',
@@ -116,12 +127,6 @@ router.post('/login', async (req, res) => {
 
     const user = users[0];
 
-    if (!user.email_verified) {
-      return res.status(403).json({
-        error: 'email_not_verified'
-      });
-    }
-
     const passwordMatches = await bcrypt.compare(
       password,
       user.password_hash
@@ -130,6 +135,12 @@ router.post('/login', async (req, res) => {
     if (!passwordMatches) {
       return res.status(401).json({
         error: 'invalid_credentials'
+      });
+    }
+
+    if (!user.email_verified) {
+      return res.status(403).json({
+        error: 'email_not_verified'
       });
     }
 

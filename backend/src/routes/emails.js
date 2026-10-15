@@ -32,12 +32,8 @@ router.post('/test', authenticateToken, async (req, res) => {
   try {
     const userEmail = req.user.email;
 
-    if (
-      !process.env.EMAIL_USER ||
-      !process.env.EMAIL_PASS ||
-      process.env.EMAIL_USER === 'placeholder' ||
-      process.env.EMAIL_PASS === 'placeholder'
-    ) {
+    const transporter = require('../mailer');
+    if (!transporter.isConfigured()) {
       await db.query(
         `INSERT INTO emails (status, subject, to_email)
          VALUES (?, ?, ?)`,
@@ -48,8 +44,6 @@ router.post('/test', authenticateToken, async (req, res) => {
         error: 'email_not_configured'
       });
     }
-
-    const transporter = require('../mailer');
 
     await transporter.sendMail({
       from: process.env.EMAIL_USER,

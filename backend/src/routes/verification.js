@@ -103,6 +103,11 @@ router.post('/resend-verification', async (req, res) => {
       });
     }
 
+    const transporter = require('../mailer');
+    if (!transporter.isConfigured()) {
+      return res.status(503).json({ error: 'email_not_configured' });
+    }
+
     const crypto = require('crypto');
     const token = crypto.randomBytes(32).toString('hex');
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -114,14 +119,16 @@ router.post('/resend-verification', async (req, res) => {
       [token, expires, user.id]
     );
 
-    try {
-      const transporter = require('../mailer');
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const verificationLink = `${frontendUrl}/verify-email?token=${encodeURIComponent(token)}`;
 
+    try {
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
         to: user.email,
         subject: 'Verify your Inventra account',
-        text: `Hello ${user.name}, your verification token is: ${token}`
+        text: `Hello ${user.name}, verify your Inventra account using this link: ${verificationLink}`,
+        html: `<p>Hello ${user.name},</p><p><a href="${verificationLink}">Verify your Inventra account</a></p><p>This link expires in 24 hours.</p>`
       });
     } catch (emailError) {
       console.error('Resend verification email error:', emailError.message);

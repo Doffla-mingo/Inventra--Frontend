@@ -161,12 +161,43 @@ router.post('/import/csv', authenticateToken, upload.single('file'), async (req,
       });
     }
 
-    const records = parse(req.file.buffer.toString('utf8'), {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-      bom: true
-    });
+    const headerAliases = {
+      barcode: 'qr_code',
+      sku: 'qr_code',
+      product_code: 'qr_code',
+      product_name: 'name',
+      item_name: 'name',
+      qty: 'quantity',
+      stock: 'quantity',
+      stock_quantity: 'quantity',
+      expiry: 'expiry_date',
+      expirydate: 'expiry_date',
+      expiration_date: 'expiry_date',
+      unit_price: 'price'
+    };
+
+    let records;
+    try {
+      records = parse(req.file.buffer.toString('utf8'), {
+        columns: headers => headers.map(header => {
+          const normalized = String(header)
+            .replace(/^\uFEFF/, '')
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_|_$/g, '');
+          return headerAliases[normalized] || normalized;
+        }),
+        skip_empty_lines: true,
+        trim: true,
+        bom: true
+      });
+    } catch (parseError) {
+      return res.status(400).json({
+        error: 'invalid_csv',
+        message: parseError.message
+      });
+    }
 
     const requiredColumns = [
       'qr_code',
@@ -176,17 +207,23 @@ router.post('/import/csv', authenticateToken, upload.single('file'), async (req,
       'price'
     ];
 
-    if (records.length > 0) {
-      const missingColumns = requiredColumns.filter(
-        column => !Object.prototype.hasOwnProperty.call(records[0], column)
-      );
+    const actualColumns = records.columns || Object.keys(records[0] || {});
+    const missingColumns = requiredColumns.filter(
+      column => !actualColumns.includes(column)
+    );
 
-      if (missingColumns.length > 0) {
-        return res.status(400).json({
-          error: 'missing_csv_columns',
-          columns: missingColumns
-        });
-      }
+    if (missingColumns.length > 0) {
+      return res.status(400).json({
+        error: 'missing_csv_columns',
+        columns: missingColumns
+      });
+    }
+
+    if (records.length === 0) {
+      return res.status(400).json({
+        error: 'empty_csv_file',
+        message: 'The CSV contains headers but no product rows.'
+      });
     }
 
     let inserted = 0;
