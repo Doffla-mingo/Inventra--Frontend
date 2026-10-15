@@ -1,36 +1,51 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+
+const verificationRequests = new Map();
+
+function verifyToken(token) {
+  if (!verificationRequests.has(token)) {
+    verificationRequests.set(
+      token,
+      api.get('/auth/verify-email', { params: { token } })
+    );
+  }
+  return verificationRequests.get(token);
+}
 
 export default function VerifyEmailPage() {
   const [status, setStatus]   = useState('verifying'); // verifying | success | error | expired
   const [message, setMessage] = useState('');
   const [params]  = useSearchParams();
   const navigate  = useNavigate();
+  const { completeLogin, logout } = useAuth();
   const token     = params.get('token');
 
   useEffect(() => {
     if (!token) { setStatus('error'); setMessage('No token found in URL.'); return; }
 
-    api.get(`/auth/verify-email?token=${token}`)
+    verifyToken(token)
       .then(res => {
         const { token: jwt, user } = res.data;
-        // Auto-login: store token and redirect
-        localStorage.setItem('token', jwt);
-        localStorage.setItem('user', JSON.stringify(user));
+        completeLogin(jwt, user);
         setStatus('success');
         setTimeout(() => navigate('/'), 2000);
       })
       .catch(err => {
         const msg = err.response?.data?.error;
+        logout();
         if (msg === 'expired') {
           setStatus('expired');
         } else {
           setStatus('error');
-          setMessage(msg || 'Verification failed.');
+          setMessage(msg === 'invalid_token'
+            ? 'This link is invalid or has been replaced by a newer verification email. Open the latest verification email or request another link from the login page.'
+            : msg || 'Verification failed.');
         }
       });
-  }, [token]);
+  }, [token, completeLogin]);
 
   const icon    = { verifying:'⏳', success:'✅', error:'❌', expired:'⌛' }[status];
   const heading = {

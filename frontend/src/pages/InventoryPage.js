@@ -72,7 +72,14 @@ export default function InventoryPage() {
       toast.success(`Imported: ${r.data.inserted} added, ${r.data.updated} updated`);
       load();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Import failed');
+      const data = err.response?.data;
+      if (data?.error === 'missing_csv_columns') {
+        toast.error(`CSV is missing required columns: ${data.columns.join(', ')}. Required: qr_code, name, quantity, expiry_date, price.`);
+      } else if (data?.error === 'invalid_csv' || data?.error === 'empty_csv_file') {
+        toast.error(data.message || 'The CSV file is empty or malformed.');
+      } else {
+        toast.error(data?.error || 'Import failed');
+      }
     } finally { setImporting(false); e.target.value = ''; }
   };
 

@@ -13,8 +13,10 @@ api.interceptors.request.use(cfg => {
 api.interceptors.response.use(
   res => res,
   err => {
-    if (err.response?.status === 401) {
+    const authFormRequest = /\/auth\/(login|register)$/.test(err.config?.url || '');
+    if (err.response?.status === 401 && !authFormRequest) {
       localStorage.removeItem('token');
+      localStorage.removeItem('user');
       window.location.href = '/login';
     }
     return Promise.reject(err);

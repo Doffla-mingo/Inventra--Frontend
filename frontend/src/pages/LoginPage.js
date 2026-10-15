@@ -9,11 +9,16 @@ export default function LoginPage() {
   const [loading, setLoading]   = useState(false);
   const [form, setForm]         = useState({ name:'', email:'', password:'', store_name:'' });
   const [pendingEmail, setPendingEmail] = useState(''); // show "check your inbox" screen
+  const [verificationSent, setVerificationSent] = useState(false);
   const [resending, setResending]       = useState(false);
+  const [loginError, setLoginError]     = useState('');
   const { login, register }     = useAuth();
   const toast    = useToast();
   const navigate = useNavigate();
-  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+  const set = k => e => {
+    setLoginError('');
+    setForm(f => ({ ...f, [k]: e.target.value }));
+  };
 
   const handleLogin = async e => {
     e.preventDefault();
@@ -25,9 +30,30 @@ export default function LoginPage() {
     } catch (err) {
       const data = err.response?.data;
       if (data?.error === 'email_not_verified') {
-        setPendingEmail(data.email || form.email);
+        setVerificationSent(false);
+        const email = data.email || form.email;
+        setPendingEmail(email);
+        setResending(true);
+        try {
+          await api.post('/auth/resend-verification', { email });
+          setVerificationSent(true);
+          toast.success('Verification link sent — check your email');
+        } catch (sendError) {
+          const sendErrorCode = sendError.response?.data?.error;
+          if (sendErrorCode === 'email_not_configured') {
+            setLoginError('Email is not configured. Check EMAIL_USER and EMAIL_PASS in backend/.env.');
+          } else if (sendErrorCode === 'email_send_failed') {
+            setLoginError('Could not send the verification email. Check the backend mail settings and connection, then use resend.');
+          } else {
+            setLoginError(sendErrorCode || 'Could not send the verification email.');
+          }
+        } finally {
+          setResending(false);
+        }
       } else {
-        toast.error(data?.error || 'Login failed');
+        setLoginError(data?.error === 'invalid_credentials'
+          ? 'Email or password is incorrect. Check both and try again.'
+          : data?.error || 'Login failed. Please try again.');
       }
     } finally { setLoading(false); }
   };
@@ -40,12 +66,22 @@ export default function LoginPage() {
     try {
       const res = await api.post('/auth/register', form);
       if (res.data.message === 'verification_sent') {
+        setVerificationSent(true);
         setPendingEmail(res.data.email || form.email);
       } else {
         navigate('/');
       }
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Registration failed');
+      const error = err.response?.data?.error;
+      if (error === 'email_send_failed') {
+        setVerificationSent(false);
+        setPendingEmail(form.email);
+        toast.error('Account created, but the first verification email failed to send. Use resend after checking the backend email settings and connection.');
+      } else if (error === 'email_not_configured') {
+        toast.error('Email is not configured. Set EMAIL_USER and EMAIL_PASS in backend/.env, then restart the backend.');
+      } else {
+        toast.error(error || 'Registration failed');
+      }
     } finally { setLoading(false); }
   };
 
@@ -53,9 +89,17 @@ export default function LoginPage() {
     setResending(true);
     try {
       await api.post('/auth/resend-verification', { email: pendingEmail });
+      setVerificationSent(true);
       toast.success('Verification email resent — check your inbox');
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Could not resend');
+      const error = err.response?.data?.error;
+      if (error === 'email_not_configured') {
+        toast.error('Email is not configured. Set EMAIL_USER and EMAIL_PASS in backend/.env, then restart the backend.');
+      } else if (error === 'email_send_failed') {
+        toast.error('The mail server rejected the message. Check backend mail settings and logs.');
+      } else {
+        toast.error(error || 'Could not resend');
+      }
     } finally { setResending(false); }
   };
 
@@ -91,16 +135,19 @@ export default function LoginPage() {
         <Logo />
         <div className="card" style={{ textAlign:'center', padding:'32px 24px' }}>
           <div style={{ fontSize:'48px', marginBottom:'16px' }}>📬</div>
-          <div style={{ fontSize:'16px', fontWeight:'600', marginBottom:'8px' }}>Check your inbox</div>
+          <div style={{ fontSize:'16px', fontWeight:'600', marginBottom:'8px' }}>
+            {verificationSent ? 'Check your inbox' : 'Email verification required'}
+          </div>
           <div style={{ fontSize:'13px', color:'var(--muted)', marginBottom:'6px' }}>
-            We sent a verification link to
+            {verificationSent ? 'We sent a verification link to' : 'This account is not verified yet. Request a link for'}
           </div>
           <div style={{ fontSize:'14px', fontWeight:'600', color:'var(--accent)', marginBottom:'20px', wordBreak:'break-all' }}>
             {pendingEmail}
           </div>
           <div style={{ fontSize:'12px', color:'var(--muted)', marginBottom:'24px', lineHeight:'1.6' }}>
-            Click the link in the email to activate your account.<br/>
-            The link expires in <strong>24 hours</strong>.
+            {verificationSent
+              ? <>Click the link in the email to activate your account.<br/>The link expires in <strong>24 hours</strong>.</>
+              : 'Use the button below to send a new verification link.'}
           </div>
           <button className="btn btn-ghost btn-full" onClick={resendVerification} disabled={resending}>
             {resending ? <><span className="spinner"/> Sending...</> : '↻ Resend verification email'}
@@ -135,6 +182,11 @@ export default function LoginPage() {
 
           {tab === 'login' && (
             <form onSubmit={handleLogin}>
+              {loginError && (
+                <div role="alert" style={{ color:'var(--danger)', fontSize:'12px', marginBottom:'14px', lineHeight:'1.5' }}>
+                  {loginError}
+                </div>
+              )}
               <div className="form-group">
                 <label>Email address</label>
                 <input type="email" placeholder="you@company.com" value={form.email} onChange={set('email')} />

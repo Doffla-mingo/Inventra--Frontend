@@ -21,14 +21,14 @@ function PrivateRoute({ children }) {
       <div className="spinner" style={{ width:'28px', height:'28px' }} />
     </div>
   );
-  return user ? children : <Navigate to="/login" replace />;
+  return user?.email_verified ? children : <Navigate to="/login" replace />;
 }
 
 function AppRoutes() {
   const { user } = useAuth();
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/login" element={user?.email_verified ? <Navigate to="/" replace /> : <LoginPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route index          element={<ScannerPage />} />

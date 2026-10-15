@@ -1,6 +1,15 @@
 Inventra-backend
 Website which actually helps retailers !
 
+## Gmail verification email setup
+
+The backend sends verification links through Gmail SMTP. Use the email entries in
+`backend/.env.example` to update `backend/.env`. Set `EMAIL_USER` to the sending Gmail address, and set
+`EMAIL_PASS` to a Google App Password (not the Gmail account password). App
+Passwords require 2-Step Verification on the Google account. Restart the backend
+after changing `.env`. Registration and resend requests report an error if mail
+is not configured or Gmail rejects the message.
+
 📦 Inventory Management Backend
 
 A robust backend system for managing inventory with automated database triggers and email notifications. This project is built to handle inventory operations efficiently while keeping users informed in real-time.
