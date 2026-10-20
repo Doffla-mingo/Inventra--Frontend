@@ -9,6 +9,55 @@ const SEV_COLOR   = { high: 'var(--danger)', medium: 'var(--warn)', low: 'var(--
 const URG_COLOR   = { immediate: 'var(--danger)', 'this week': 'var(--warn)', 'this month': 'var(--accent)' };
 const CONF_COLOR  = { high: 'var(--success)', medium: 'var(--warn)', low: 'var(--muted)' };
 
+const normalizeForecast = forecast => {
+  const summary = forecast.summary;
+  const seasonInsight = forecast.season_insight;
+
+  return {
+    ...forecast,
+    summary: typeof summary === 'string'
+      ? summary
+      : summary
+        ? `Forecast covers ${summary.total_products || 0} products and ${summary.total_units || 0} units, with an inventory value of ₹${Number(summary.current_inventory_value || 0).toLocaleString('en-IN')}.`
+        : '',
+    season_insight: typeof seasonInsight === 'string' ? seasonInsight : seasonInsight?.insight || '',
+    best_sellers_forecast: (forecast.best_sellers_forecast || []).map(product => ({
+      ...product,
+      name: product.name || product.product,
+      expected_demand: product.expected_demand || 'medium',
+      season_relevance: product.season_relevance || 'Based on current inventory',
+      recommended_quantity: product.recommended_quantity ?? product.forecast_quantity,
+      reason: product.reason || `Current stock: ${product.current_quantity ?? 'unknown'} units`,
+      action: product.action || 'Review stock level',
+    })),
+    demand_forecast: (forecast.demand_forecast || []).map(item => ({
+      ...item,
+      category: item.category || item.product,
+      trend: item.trend || 'stable',
+      recommended_stock_change: item.recommended_stock_change || `${item.predicted_demand ?? 0} units forecast`,
+      trend_reason: item.trend_reason || `Current stock: ${item.current_quantity ?? 'unknown'} units`,
+      seasonal_factor: item.seasonal_factor || 'Based on current inventory',
+      confidence: item.confidence || 'medium',
+    })),
+    restock_alerts: (forecast.restock_alerts || []).map(alert => ({
+      ...alert,
+      name: alert.name || alert.product,
+      current_qty: alert.current_qty ?? alert.current_quantity,
+      recommended_qty: alert.recommended_qty ?? alert.recommended_quantity,
+      urgency: alert.urgency || 'this week',
+      reason: alert.reason || 'Current stock is low',
+    })),
+    risk_alerts: (forecast.risk_alerts || []).map(alert => ({
+      ...alert,
+      severity: alert.severity || 'medium',
+      type: alert.type || alert.risk || 'inventory_risk',
+      description: alert.description || `${alert.product || 'Product'} may expire on ${alert.expiry_date || 'an unknown date'}`,
+      affected_products: alert.affected_products || (alert.product ? [alert.product] : []),
+      action: alert.action || 'Review this product and adjust stock as needed',
+    })),
+  };
+};
+
 export default function ForecastPage() {
   const [forecast, setForecast]     = useState(null);
   const [season, setSeason]         = useState(null);
@@ -17,6 +66,7 @@ export default function ForecastPage() {
   const [fetching, setFetching]     = useState(true);
   const [products, setProducts]     = useState([]);
   const [activeTab, setActiveTab]   = useState('overview');
+  const [loadError, setLoadError]   = useState('');
   const toast = useToast();
 
   useEffect(() => { loadLatest(); loadProducts(); }, []);
@@ -30,11 +80,14 @@ export default function ForecastPage() {
     try {
       const r = await api.get('/forecast/latest');
       if (r.data.forecast) {
-        setForecast(r.data.forecast);
+        setForecast(normalizeForecast(r.data.forecast));
         setGeneratedAt(r.data.generated_at);
         if (r.data.season) setSeason(r.data.season);
       }
-    } catch {}
+      setLoadError('');
+    } catch (err) {
+      setLoadError(err.response?.data?.error || 'Could not load the latest forecast. Check the server connection and try again.');
+    }
     finally { setFetching(false); }
   };
 
@@ -43,9 +96,10 @@ export default function ForecastPage() {
     toast.info('Generating AI forecast... this takes 10-20 seconds');
     try {
       const r = await api.post('/forecast/generate');
-      setForecast(r.data.forecast);
+      setForecast(normalizeForecast(r.data.forecast));
       setGeneratedAt(r.data.generated_at);
       setSeason(r.data.season);
+      setLoadError('');
       toast.success('Forecast generated!');
       setActiveTab('overview');
     } catch (err) {
@@ -87,7 +141,7 @@ export default function ForecastPage() {
           <div>
             <h2 style={{ fontSize: '16px', fontWeight: '500' }}>AI Demand Forecast</h2>
             <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '3px' }}>
-              {season && <>Season: <strong style={{ color: 'var(--text)' }}>{season.season}</strong> · Upcoming: {season.upcoming?.slice(0, 4).join(', ')}</>}
+              {season && <>Season: <strong style={{ color: 'var(--text)' }}>{typeof season === 'string' ? season : season.season}</strong>{season.upcoming?.length > 0 && <> · Upcoming: {season.upcoming.slice(0, 4).join(', ')}</>}</>}
               {generatedAt && <> · Last generated: <strong style={{ color: 'var(--text)' }}>{generatedAt}</strong></>}
             </div>
           </div>
@@ -99,6 +153,11 @@ export default function ForecastPage() {
 
         {fetching ? (
           <div style={{ textAlign: 'center', padding: '60px' }}><div className="spinner" style={{ margin: '0 auto' }} /></div>
+        ) : loadError && !f ? (
+          <div className="card" style={{ padding: '24px', textAlign: 'center' }}>
+            <div style={{ color: 'var(--danger)', marginBottom: '14px' }}>{loadError}</div>
+            <button className="btn btn-primary" onClick={loadLatest}>Retry</button>
+          </div>
         ) : !f ? (
           /* Empty state */
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
